@@ -3,6 +3,7 @@
   <head>
     <title>Word2Vec Alchemy</title>
     <meta charset="utf-8" />
+    <meta name="color-scheme" content="dark light" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
   </head>
 
@@ -16,9 +17,8 @@
     <br>
     <form action="javascript:add_word_from_input()">
       <input type="text" id="new_word_input">
-      <input type="submit" value="guess new word">
-      common nouns only
-      (<a href="https://www.desiquintans.com/nounlist">details</a>)
+      <input type="submit" value="add new word">
+      (<a href="https://www.desiquintans.com/nounlist">dictionary is limited to common nouns</a>)
     </form>
 
     <script>
@@ -69,8 +69,9 @@ function remove_highlights(){
 
 function add_word_from_input(){
   const word_input = $('#new_word_input')
-  if(word_input in embeddings){
-    add_word(word_input.value)
+  const word = word_input.value.toLowerCase()
+  if(word in embeddings){
+    add_word(word)
   }
   word_input.value = ""
 }
@@ -146,7 +147,7 @@ function vec_similarity(a,b){
     </script>
     <style>
 .highlight {
-  background-color: aqua;
+  background-color:darkorange;
 }
     </style>
   </body>
