@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <title>Word2Vec Alchemy</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+
+  <body>
+    <h1>Word2Vec Alchemy</h1>
+    <p id="loading_text">loading...</p>
+    <div id="words_div">
+    </div>
+    <hr>
+    <button onclick="merge()">merge!</button>
+    <br>
+    <form action="javascript:add_word_from_input()">
+      <input type="text" id="new_word_input">
+      <input type="submit" value="guess new word">
+      common nouns only
+      (<a href="https://www.desiquintans.com/nounlist">details</a>)
+    </form>
+
+    <script>
+// helper functions
+function $(query){ return document.querySelector(query) }
+function el(name, attributes = {}, children = []){
+  let el = document.createElement(name)
+  for(let a in attributes){
+  el.setAttribute(a, attributes[a])
+  }
+  el.append(...children)
+  return el
+}
+
+// variables
+const current_selection = new Set()
+var embeddings = null
+
+fetch("noun_embeddings.json")
+  .then(res => res.json())
+  .then(res => {embeddings = res; $('#loading_text').hidden=true})
+//fetch("noun_embeddings.json").then(res => res.json()).then(res => embeddings = res)
+const found_words = new Set()
+
+// starting words
+add_word("fire")
+add_word("water")
+add_word("wind")
+add_word("stone")
+
+
+
+function toggle_highlight(e){ 
+  e.classList.toggle("highlight")
+  if(!current_selection.has(e.id)){
+    console.log("added", e.id)
+    current_selection.add(e.id)
+  }
+  else { current_selection.delete(e.id) ;console.log("removed", e.id)}
+}
+
+function remove_highlights(){
+  for(word of current_selection){
+    $('#' + word).classList.remove("highlight")
+  }
+  current_selection.clear()
+}
+
+function add_word_from_input(){
+  const word_input = $('#new_word_input')
+  if(word_input in embeddings){
+    add_word(word_input.value)
+  }
+  word_input.value = ""
+}
+
+function add_word(word){
+  if(found_words.has(word)) return
+  found_words.add(word)
+
+  const words_div = $('#words_div')
+  const button = el("button", {id: word}, word)
+  button.addEventListener("click", (e) => toggle_highlight(e.target))
+  words_div.appendChild(button)
+}
+
+function merge(){
+  merge_words(current_selection)
+}
+
+function merge_words(words){
+  if(!embeddings) return // not yet ready
+
+  // get arithmetic mean of word embeddings
+  const merged_embedding = new Array(embeddings["word"].length).fill(0)
+  for(let word of words){
+    console.log("merging word: ", word)
+    console.log("embs: ", embeddings[word])
+    let embedding = embeddings[word]
+    for(let i=0; i<embedding.length; ++i){
+      merged_embedding[i] += embedding[i] / words.size
+    }
+  }
+  console.log("merged embedding: ", merged_embedding)
+  console.log("find closest word...")
+
+  // get word closest to embedding
+  let closest_word = ""
+  let similarity = -1
+  for (let [word, embedding] of Object.entries(embeddings)){
+    let s = vec_similarity(embedding, merged_embedding)
+    if(s > similarity){
+      console.log("new closest word: ", word, s)
+      if(words.has(word)) {console.log("skip"); continue}
+      similarity = s
+      closest_word = word
+    }
+  }
+
+  if(!found_words.has(closest_word)){
+    add_word(closest_word)
+  }
+  console.log(closest_word)
+
+  remove_highlights()
+  toggle_highlight($('#'+closest_word))
+}
+
+function vec_length(arr){
+  let l = 0
+  arr.forEach(x=> l+= x*x)
+  return Math.sqrt(l)
+}
+
+// cosine distance
+function vec_similarity(a,b){
+  let similarity = 0
+  for(let i=0; i<a.length; ++i){
+    similarity += a[i] * b[i]
+  }
+  //console.log(l_a, l_b, similarity)
+  return similarity / (vec_length(a) * vec_length(b))
+}
+
+    </script>
+    <style>
+.highlight {
+  background-color: aqua;
+}
+    </style>
+  </body>
+</html>
