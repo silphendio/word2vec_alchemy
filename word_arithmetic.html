@@ -66,20 +66,20 @@ function eval_word_math_input(num_results = 10){
   console.log("looking up vectors...")
   // replacing words
   //while(true){
-  for(let __i=0; __i < 10; ++__i){
+  for(let __i = 0; __i<100; ++__i){
     let match = expr.match(/[a-zA-Z]+/)
     if(match === null) break
 
-    console.log(match[0], match[0] in embeddings)
+    let word = match[0].toLocaleLowerCase()
 
-    if(!(match[0] in embeddings)){
+    if(!(word in embeddings)){
       // TODO: better error handling
       
       $('#error_span').hidden = false
-      $('#error_span').textContent = "Error: '" + match[0] + "' is not in dictionary"
+      $('#error_span').textContent = "Error: '" + word + "' is not in dictionary"
       return
     }
-    expr = expr.replace(match[0], JSON.stringify(embeddings[match[0]]))
+    expr = expr.replace(match[0], JSON.stringify(embeddings[word]))
   }
 
   console.log("calculating...")
@@ -122,13 +122,8 @@ function eval_word_math_input(num_results = 10){
     if(i < num_results){
         closest_words.splice(i, 0, word)
         similarities.splice(i, 0, s)
-        console.log(word, s, i)
       }
   }
-
-  console.log(result)
-  console.log(closest_words)
-  console.log(similarities)
 
   // add matches into results_table
   let results_table = $('#results_table')
