@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <title>Word2Vec Alchemy</title>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://unpkg.com/mathjs@12.3.1/lib/browser/math.js"></script>
+  </head>
+
+  <body>
+    <h1>Word2Vec Arithmetic</h1>
+    <p id="loading_text">loading...</p>
+    <form action="javascript:eval_word_math_input()">
+      <input type="text" id="word_math_input">
+      <input type="submit" value="calculate" placeholder="king + woman - man">
+    </form>
+    <span id="error_span"></span>
+    <br>
+    <a href="https://www.desiquintans.com/nounlist">dictionary is limited to common nouns</a><br>
+    Closest words are calculated using Cosing Similarity, so scaling doesn't matter.
+    <h3>Results:</h3>
+    <table id="results_table">
+
+    </table>
+
+
+    <script>
+// helper functions
+function $(query){ return document.querySelector(query) }
+function el(name, attributes = {}, children = []){
+  let el = document.createElement(name)
+  for(let a in attributes){
+  el.setAttribute(a, attributes[a])
+  }
+  el.append(...children)
+  return el
+}
+
+// variables
+var embeddings = null
+
+fetch("noun_embeddings.json")
+  .then(res => res.json())
+  .then(res => {embeddings = res; $('#loading_text').hidden=true})
+//fetch("noun_embeddings.json").then(res => res.json()).then(res => embeddings = res)
+const found_words = new Set()
+
+
+
+function eval_word_math_input(num_results = 10){
+  $('#error_span').hidden = true
+  $('#results_table').innerHTML = ""
+
+
+  let expr = $('#word_math_input').value
+
+  console.log("looking up vectors...")
+  // replacing words
+  //while(true){
+  for(let __i=0; __i < 10; ++__i){
+    let match = expr.match(/[a-zA-Z]+/)
+    if(match === null) break
+
+    console.log(match[0], match[0] in embeddings)
+
+    if(!(match[0] in embeddings)){
+      // TODO: better error handling
+      
+      $('#error_span').hidden = false
+      $('#error_span').textContent = "Error: '" + match[0] + "' is not in dictionary"
+      return
+    }
+    expr = expr.replace(match[0], JSON.stringify(embeddings[match[0]]))
+  }
+
+  console.log("calculating...")
+
+
+  // calculating...
+  try{
+    result = math.evaluate(expr).toArray()
+  }
+  catch(error){
+    $('#error_span').hidden = false
+    $('#error_span').textContent = error
+    return
+  }
+  result = math.squeeze(result)
+
+  // find closest matches
+
+  result = math.divide(result, math.norm(result))
+  
+  let closest_words = new Array(num_results).fill("xxx")
+  let similarities = new Array(num_results).fill(-Infinity)
+  for (let [word, embedding] of Object.entries(embeddings)){
+
+    embedding = math.squeeze(embedding)
+    embedding = math.divide(embedding, math.norm(embedding))
+
+    let s = math.dot(result, embedding)
+
+    let i = num_results
+    while(true){
+      if(s < similarities[i]){
+        i += 1
+        break
+      }
+      if(i == 0) break
+      --i
+    }
+
+    if(i < num_results){
+        closest_words.splice(i, 0, word)
+        similarities.splice(i, 0, s)
+        console.log(word, s, i)
+      }
+  }
+
+  console.log(result)
+  console.log(closest_words)
+  console.log(similarities)
+
+  // add matches into results_table
+  let results_table = $('#results_table')
+
+  for(let i=0; i<num_results; ++i){
+    results_table.append(el('tr', {}, [
+      el('td', {}, closest_words[i]),
+      el('td', {}, String(similarities[i])),
+    ]))
+  }
+
+
+}
+
+
+    </script>
+    <style>
+.highlight {
+  background-color:darkorange;
+}
+
+table, th, td {
+  border:1px solid;
+}
+#error_span {
+  color:red;
+}
+
+    </style>
+  </body>
+</html>
