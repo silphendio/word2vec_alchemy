@@ -12,18 +12,26 @@
     <h1>Word2Vec Arithmetic</h1>
     <p id="loading_text">loading...</p>
     <form action="javascript:eval_word_math_input()">
-      <input type="text" id="word_math_input">
-      <input type="submit" value="calculate" placeholder="king + woman - man">
+      <input type="text" id="word_math_input" placeholder="king + (woman - man) * 2">
+      <input type="submit" value="calculate">
     </form>
     <span id="error_span"></span>
     <br>
     <a href="https://www.desiquintans.com/nounlist">dictionary is limited to common nouns</a><br>
-    Closest words are calculated using Cosing Similarity, so scaling doesn't matter.
+    Closest words are calculated using Cosine Similarity, so scaling doesn't matter.
     <h3>Results:</h3>
     <table id="results_table">
 
     </table>
 
+    <br>
+    <div>
+      <a href="/">Alchemy Sandbox</a>
+      <br>
+      <a href="https://github.com/silphendio/word2vec_alchemy">Github Repository</a>
+      <br>
+      powered by <a href="https://mathjs.org">math.js</a>
+    </div>
 
     <script>
 // helper functions
