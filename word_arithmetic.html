@@ -60,12 +60,10 @@ function eval_word_math_input(num_results = 10){
   $('#error_span').hidden = true
   $('#results_table').innerHTML = ""
 
-
   let expr = $('#word_math_input').value
 
   console.log("looking up vectors...")
   // replacing words
-  //while(true){
   while(true){
     let match = expr.match(/[a-zA-Z]+/)
     if(match === null) break
@@ -94,47 +92,40 @@ function eval_word_math_input(num_results = 10){
     $('#error_span').textContent = error
     return
   }
-  result = math.squeeze(result)
+  matches = find_topk_words(result, num_results)
 
-  // find closest matches
-
-  result = math.divide(result, math.norm(result))
-  
-  let closest_words = new Array(num_results).fill("xxx")
-  let similarities = new Array(num_results).fill(-Infinity)
-  for (let [word, embedding] of Object.entries(embeddings)){
-
-    embedding = math.squeeze(embedding)
-    embedding = math.divide(embedding, math.norm(embedding))
-
-    let s = math.dot(result, embedding)
-
-    let i = num_results
-    while(true){
-      if(s < similarities[i]){
-        i += 1
-        break
-      }
-      if(i == 0) break
-      --i
-    }
-
-    if(i < num_results){
-        closest_words.splice(i, 0, word)
-        similarities.splice(i, 0, s)
-      }
-  }
 
   // add matches into results_table
   let results_table = $('#results_table')
 
   for(let i=0; i<num_results; ++i){
     results_table.append(el('tr', {}, [
-      el('td', {}, closest_words[i]),
-      el('td', {}, String(similarities[i])),
+      el('td', {}, matches[i].word),
+      el('td', {}, String(matches[i].similarity)),
     ]))
   }
+}
 
+function find_topk_words(word_vec, num_results = 1, exclude_words = []){
+  word_vec = math.squeeze(word_vec)
+  word_vec = math.divide(word_vec, math.norm(result))
+  
+  let matches = new Array(num_results).fill({word: "", similarity: -Infinity})
+
+  for (let [word, embd] of Object.entries(embeddings)){
+
+    if(exclude_words.includes(word)) continue
+
+    embd = math.divide(embd, math.norm(embd))
+    let s = math.dot(word_vec, embd)
+
+    let i = num_results
+    while(i > 0 && s > matches[i-1].similarity) i -= 1
+    if(i < num_results){
+      matches.splice(i, 0, {word: word, similarity: s})
+    }
+  }
+  return matches
 
 }
 
