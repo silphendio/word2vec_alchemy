@@ -5,6 +5,7 @@
     <meta charset="utf-8" />
     <meta name="color-scheme" content="dark light" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://unpkg.com/mathjs@12.3.1/lib/browser/math.js"></script>
   </head>
 
   <body>
@@ -13,18 +14,31 @@
     <div id="words_div">
     </div>
     <br>
-    <div><button onclick="merge()">merge!</button></div>
+    <div><button onclick="click_merge()">merge!</button></div>
     <br>
     <form action="javascript:add_word_from_input()">
       <input type="text" id="new_word_input">
       <input type="submit" value="add new word">
-      (<a href="https://www.desiquintans.com/nounlist">dictionary is limited to common nouns</a>)
+      (if available)
     </form>
+    <br><hr>
+    <h2>Word2Vec Arithmetic</h2>
+    <form action="javascript:process_word_math_input()">
+      <input type="text" id="word_math_input" placeholder="king + (woman - man) * 2">
+      <input type="submit" value="calculate">
+    </form>
+    <span id="error_span"></span>
     <br>
+    <a href="https://www.desiquintans.com/nounlist">dictionary is limited to common nouns</a><br>
+    Closest words are calculated using Cosine Similarity, so scaling doesn't matter.
+    <h3>Results:</h3>
+    <table id="results_table"></table>
+    <br><hr><br>
     <div>
-      <a href="word_arithmetic.html">Word Vector Calculator</a>
-      <br>
-      <a href="https://github.com/silphendio/word2vec_alchemy">Github Repository</a>
+      <a href="https://github.com/silphendio/word2vec_alchemy">Github Repository</a><br>
+      word embeddings from <a href="https://nlp.stanford.edu/projects/glove/">GloVe</a><br>
+      filtered to <a href="https://www.desiquintans.com/nounlist">The Great Noun List </a><br>
+      powered by <a href="https://mathjs.org">math.js</a>
     </div>
 
     <script>
@@ -45,7 +59,15 @@ var embeddings = null
 
 fetch("noun_embeddings.json")
   .then(res => res.json())
-  .then(res => {embeddings = res; $('#loading_text').hidden=true})
+  .then(res => {
+    embeddings = res
+    for (let [word, embd] of Object.entries(embeddings)){
+      // this is really slow in math.js, and we're only interested in the angle between words
+      embeddings[word] = math.divide(embd, math.norm(embd))
+    }
+    $('#loading_text').hidden=true
+  })
+
 //fetch("noun_embeddings.json").then(res => res.json()).then(res => embeddings = res)
 const found_words = new Set()
 
@@ -54,7 +76,6 @@ add_word("fire")
 add_word("water")
 add_word("wind")
 add_word("stone")
-
 
 
 function toggle_highlight(e){ 
@@ -92,8 +113,15 @@ function add_word(word){
   words_div.appendChild(button)
 }
 
-function merge(){
-  merge_words(current_selection)
+function click_merge(){
+  let closest_word = merge_words(current_selection)
+
+  if(!found_words.has(closest_word)){
+    add_word(closest_word)
+  }
+
+  remove_highlights()
+  toggle_highlight($('#'+closest_word))
 }
 
 function merge_words(words){
@@ -102,52 +130,77 @@ function merge_words(words){
   // get arithmetic mean of word embeddings
   const merged_embedding = new Array(embeddings["word"].length).fill(0)
   for(let word of words){
-    console.log("merging word: ", word)
-    console.log("embs: ", embeddings[word])
     let embedding = embeddings[word]
     for(let i=0; i<embedding.length; ++i){
       merged_embedding[i] += embedding[i] / words.size
     }
   }
-  console.log("merged embedding: ", merged_embedding)
-  console.log("find closest word...")
 
-  // get word closest to embedding
-  let closest_word = ""
-  let similarity = -1
-  for (let [word, embedding] of Object.entries(embeddings)){
-    let s = vec_similarity(embedding, merged_embedding)
-    if(s > similarity){
-      console.log("new closest word: ", word, s)
-      if(words.has(word)) {console.log("skip"); continue}
-      similarity = s
-      closest_word = word
+  return find_topk_words(merged_embedding, 1, words)[0].word
+}
+
+function process_word_math_input(num_results = 10){
+  $('#error_span').hidden = true
+  $('#results_table').innerHTML = ""
+
+  let expr = $('#word_math_input').value
+
+  // replace words with vectors
+  while(true){
+    let match = expr.match(/[a-zA-Z]+/)
+    if(match === null) break
+
+    let word = match[0].toLocaleLowerCase()
+
+    if(!(word in embeddings)){
+      $('#error_span').hidden = false
+      $('#error_span').textContent = "Error: '" + word + "' is not in dictionary"
+      return
+    }
+    expr = expr.replace(match[0], JSON.stringify(embeddings[word]))
+  }
+
+  // calculate result
+  try{
+    result = math.evaluate(expr).toArray()
+  }
+  catch(error){
+    $('#error_span').hidden = false
+    $('#error_span').textContent = error
+    return
+  }
+  matches = find_topk_words(result, num_results)
+
+  // add matches into results_table
+  let results_table = $('#results_table')
+
+  for(let i=0; i<num_results; ++i){
+    results_table.append(el('tr', {}, [
+      el('td', {}, matches[i].word),
+      el('td', {}, String(matches[i].similarity)),
+    ]))
+  }
+}
+
+function find_topk_words(word_vec, num_results = 1, exclude_words = new Set()){
+  word_vec = math.squeeze(word_vec)
+  word_vec = math.divide(word_vec, math.norm(word_vec))
+  
+  let matches = new Array(num_results).fill({word: "", similarity: -Infinity})
+
+  for (let [word, embd] of Object.entries(embeddings)){
+
+    if(exclude_words.has(word)) continue
+
+    let s = math.dot(word_vec, embd)
+
+    let i = num_results
+    while(i > 0 && s > matches[i-1].similarity) i -= 1
+    if(i < num_results){
+      matches.splice(i, 0, {word: word, similarity: s})
     }
   }
-
-  if(!found_words.has(closest_word)){
-    add_word(closest_word)
-  }
-  console.log(closest_word)
-
-  remove_highlights()
-  toggle_highlight($('#'+closest_word))
-}
-
-function vec_length(arr){
-  let l = 0
-  arr.forEach(x=> l+= x*x)
-  return Math.sqrt(l)
-}
-
-// cosine distance
-function vec_similarity(a,b){
-  let similarity = 0
-  for(let i=0; i<a.length; ++i){
-    similarity += a[i] * b[i]
-  }
-  //console.log(l_a, l_b, similarity)
-  return similarity / (vec_length(a) * vec_length(b))
+  return matches
 }
 
     </script>
@@ -155,6 +208,13 @@ function vec_similarity(a,b){
 .highlight {
   background-color:darkorange;
 }
+table, th, td {
+  border:1px solid;
+}
+#error_span {
+  color:red;
+}
+
     </style>
   </body>
 </html>
