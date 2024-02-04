@@ -183,7 +183,6 @@ function process_word_math_input(num_results = 10){
 }
 
 function find_topk_words(word_vec, num_results = 1, exclude_words = new Set()){
-  word_vec = math.squeeze(word_vec)
   word_vec = math.divide(word_vec, math.norm(word_vec))
   
   let matches = new Array(num_results).fill({word: "", similarity: -Infinity})
